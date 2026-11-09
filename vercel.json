@@ -1,0 +1,4 @@
+{
+  "framework": "nextjs",
+  "functions": { "app/api/news/route.js": { "maxDuration": 20 } }
+}
