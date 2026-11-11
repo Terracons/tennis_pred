@@ -1039,6 +1039,22 @@ th:first-child {
   margin: 25px 0;
   align-items: center;
 }
+.recent-meetings {
+  margin: 16px 0;
+  line-height: 1.7;
+}
+.recent-meetings summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+.recent-meetings ol {
+  padding-left: 20px;
+  font-size: 13px;
+}
+.recent-meetings .micro {
+  white-space: normal;
+  max-width: 480px;
+}
 .export-text {
   margin-top: 20px;
   color: var(--muted);

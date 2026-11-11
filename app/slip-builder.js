@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { buildSlip, slipText } from "../lib/slips.mjs";
 import { lagosDay } from "../lib/live-board.mjs";
+import RecentMeetings from "./recent-meetings";
 const percent = (n) => (n * 100).toFixed(1) + "%";
 const displayDate = (s) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -280,9 +281,9 @@ export default function SlipBuilder({ model }) {
             </p>
             <p>
               Feed fetched {displayDate(board.fetchedAt)}. Refresh after{" "}
-              {displayDate(board.expiresAt)}. The historical model's latest
-              tournament is {board.modelDataThrough}; live odds do not update
-              its player histories.
+              {displayDate(board.expiresAt)}. Player histories checked{" "}
+              {displayDate(board.historyCheckedAt)}; latest included result
+              source date: {board.modelDataThrough}.
             </p>
             {board.coverageLimited && (
               <p className="notice">
@@ -335,6 +336,15 @@ export default function SlipBuilder({ model }) {
                         </td>
                         <td>{percent(p.probability)}</td>
                         <td>
+                          <RecentMeetings
+                            h2h={p.h2h}
+                            aId={p.aId}
+                            aName={p.aName}
+                            bName={p.bName}
+                          />
+                          <small className="cell-note">
+                            All available meetings
+                          </small>
                           {p.h2h.aWins} : {p.h2h.bWins}
                           <small className="cell-note">
                             Surface {p.h2h.surface.aWins} :{" "}
@@ -398,8 +408,9 @@ export default function SlipBuilder({ model }) {
                           </span>
                           <small>
                             {displayDate(p.startsAt)} · Model{" "}
-                            {percent(p.probability)} · H2H {p.h2h.aWins}:
-                            {p.h2h.bWins}
+                            {percent(p.probability)} · Latest{" "}
+                            {p.h2h.latest.count}/5 H2H {p.h2h.latest.aWins}:
+                            {p.h2h.latest.bWins}
                           </small>
                           {p.fixtureUrl && (
                             <a
@@ -428,11 +439,11 @@ export default function SlipBuilder({ model }) {
                   </div>
                   <p className="result-note">
                     Joint probability assumes independent results; shared
-                    conditions can cause correlation. The model uses a
-                    historical snapshot, not current fitness. Verify prices,
-                    availability and tennis retirement rules on Stake. There is
-                    no booking code, automatic bet placement, or verified
-                    profitability.
+                    conditions can cause correlation. Published results refresh
+                    player histories; current fitness is not measured. Verify
+                    prices, availability and tennis retirement rules on Stake.
+                    There is no booking code, automatic bet placement, or
+                    verified profitability.
                   </p>
                   <div className="stake-preview">
                     <label>

@@ -1,3 +1,4 @@
+import RecentMeetings from "./recent-meetings";
 export default function HeadToHead({ result, surface }) {
   const h = result.h2h;
   return (
@@ -11,6 +12,13 @@ export default function HeadToHead({ result, surface }) {
         </div>
         <span className="tag">{h.total} MEETINGS</span>
       </div>
+      <RecentMeetings
+        h2h={h}
+        aId={result.a.id}
+        aName={result.a.name}
+        bName={result.b.name}
+      />
+      <p className="micro">All available meetings since 2020</p>
       <div className="h2h-score">
         <span>{result.a.name}</span>
         <strong>
@@ -27,7 +35,7 @@ export default function HeadToHead({ result, surface }) {
           <small>{h.surface.total} recorded meetings</small>
         </div>
         <div>
-          <span>Last meeting's tournament start</span>
+          <span>Latest meeting source date</span>
           <strong>{h.lastDate || "No recorded meetings"}</strong>
           <small>Not an exact match timestamp</small>
         </div>

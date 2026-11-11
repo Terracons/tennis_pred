@@ -2,11 +2,12 @@ import { unstable_cache } from "next/cache";
 import model from "../../../data/model.json";
 import { loadBoard } from "../../../lib/provider.mjs";
 import { dateWindow } from "../../../lib/live-board.mjs";
+import { getCurrentModel } from "../../../lib/current-history.mjs";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 const cachedBoard = unstable_cache(
-  (from, to) => loadBoard(model, from, to),
-  ["stake-tennis-board-v2"],
+  async (from, to) => loadBoard(await getCurrentModel(model), from, to),
+  ["stake-tennis-board-v3-latest-five"],
   { revalidate: 60 },
 );
 export async function GET(request) {

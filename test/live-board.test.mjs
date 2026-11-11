@@ -22,7 +22,7 @@ const model = {
     freshPlayer("A", "Jannik Sinner"),
     freshPlayer("B", "Carlos Alcaraz"),
   ],
-  weights: [1, 1, 0, 0.1, 0.1],
+  weights: [1, 1, 0, 0.1, 0.1, 0.1],
   headToHead: {},
   tournamentSurfaces: { Stockholm: { surface: "Hard", date: "2025-10-01" } },
 };
@@ -225,5 +225,44 @@ test("missing credentials and rate limits produce actionable, sanitized errors",
         fetcher: async () => ({ ok: false, status: 429 }),
       }),
     /rate limit/,
+  );
+});
+test("documented no-fixture responses produce an empty board or exclusion reasons", async () => {
+  const missing = () =>
+    new Response(JSON.stringify({ error: { code: "FIXTURE_NOT_FOUND" } }), {
+      status: 404,
+    });
+  const empty = await loadBoard(model, "2026-11-09", "2026-11-11", {
+    key: "test-secret",
+    now,
+    fetcher: async () => missing(),
+  });
+  assert.equal(empty.fixturesFound, 0);
+  assert.deepEqual(empty.candidates, []);
+  const noOdds = await loadBoard(model, "2026-11-09", "2026-11-11", {
+    key: "test-secret",
+    now,
+    fetcher: async (url) =>
+      url.pathname.endsWith("/fixtures")
+        ? Response.json([fixture])
+        : url.pathname.endsWith("/markets")
+          ? Response.json([market])
+          : missing(),
+  });
+  assert.equal(noOdds.supportedFixtures, 1);
+  assert.deepEqual(noOdds.candidates, []);
+  assert.equal(noOdds.excluded.length, 1);
+});
+test("unknown 404 responses are still provider failures", async () => {
+  await assert.rejects(
+    loadBoard(model, "2026-11-09", "2026-11-11", {
+      key: "test-secret",
+      now,
+      fetcher: async () =>
+        new Response(JSON.stringify({ error: { code: "NOT_FOUND" } }), {
+          status: 404,
+        }),
+    }),
+    /HTTP 404/,
   );
 });

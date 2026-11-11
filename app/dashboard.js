@@ -1,11 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { predict, SURFACES } from "../lib/model.mjs";
 import HeadToHead from "./head-to-head";
 import SlipBuilder from "./slip-builder";
 const pct = (n) => (100 * n).toFixed(1) + "%";
 const count = (n) => n.toLocaleString("en-US");
-export default function Dashboard({ model }) {
+export default function Dashboard({ model, historyError }) {
+  const router = useRouter();
+  useEffect(() => {
+    const timer = setInterval(() => router.refresh(), 15 * 60000);
+    return () => clearInterval(timer);
+  }, [router]);
   const active = model.players.filter((p) => p.lastDate >= "2025-01-01");
   const [aId, setA] = useState(active[0]?.id || model.players[0].id),
     [bId, setB] = useState(active[1]?.id || model.players[1].id),
@@ -32,6 +38,16 @@ export default function Dashboard({ model }) {
   }
   async function run(event) {
     event.preventDefault();
+    if (historyError) {
+      setError(historyError);
+      return;
+    }
+    if (Date.now() - Date.parse(model.historyCheckedAt) > 15 * 60000) {
+      setResult(null);
+      setError("Refreshing match history. Please try again in a moment.");
+      router.refresh();
+      return;
+    }
     setError("");
     setNews(null);
     try {
@@ -119,7 +135,8 @@ export default function Dashboard({ model }) {
                   : "Data & methodology"}
           </span>
           <span className="snapshot">
-            <span className="status-dot" /> Snapshot · {model.asOf}
+            <span className="status-dot" />{" "}
+            {historyError ? "Saved snapshot" : "History checked"} · {model.asOf}
           </span>
         </header>
         <div className="content">
@@ -190,15 +207,28 @@ export default function Dashboard({ model }) {
             <Metric
               label="DATA THROUGH"
               value={model.lastTournamentDate}
-              note="Tournament start date"
+              note="Latest published result source date"
               small
             />
           </div>
+          {historyError && (
+            <div className="notice" role="alert">
+              {historyError}
+            </div>
+          )}
+          {model.historyCheckedAt && !historyError && (
+            <p className="micro">
+              History checked{" "}
+              {model.historyCheckedAt.slice(0, 16).replace("T", " ")} UTC ·
+              Includes completed ongoing-tournament results · Refreshed on
+              demand every 15 minutes
+            </p>
+          )}
           {(staleDays > 45 || ageDays > 7) && (
             <div className="notice">
-              Historical snapshot: {model.asOf}. Latest included tournament
-              started {model.lastTournamentDate}. Refresh and retrain before
-              relying on current form.
+              Latest included result source date: {model.lastTournamentDate}. No
+              newer completed results are available in this feed. Older player
+              records may not reflect current form.
             </div>
           )}
           {tab === "predict" && (
@@ -413,6 +443,7 @@ export default function Dashboard({ model }) {
                       "Recent form",
                       "Head-to-head record",
                       "Same-surface meetings",
+                      "Latest five head-to-head",
                     ].map((label, i) => (
                       <div key={label}>
                         <span>{label}</span>
@@ -432,7 +463,9 @@ export default function Dashboard({ model }) {
                                 ? "Last 10 recorded results; not a fitness assessment"
                                 : i === 3
                                   ? `${result.h2h.aWins} : ${result.h2h.bWins} across ${result.h2h.total} meetings`
-                                  : `${result.h2h.surface.aWins} : ${result.h2h.surface.bWins} on ${surface}`}
+                                  : i === 4
+                                    ? `${result.h2h.surface.aWins} : ${result.h2h.surface.bWins} on ${surface}`
+                                    : `${result.h2h.latest.aWins} : ${result.h2h.latest.bWins} in the latest ${result.h2h.latest.count} available meetings`}
                         </small>
                       </div>
                     ))}
@@ -562,7 +595,8 @@ export default function Dashboard({ model }) {
                   Overall Elo difference, surface Elo difference, and the
                   difference in each player's win rate over their last 10
                   recorded matches, plus recency-weighted overall and
-                  same-surface head-to-head records. These records use a
+                  same-surface head-to-head records, plus a separate feature for
+                  the latest five available meetings. These records use a
                   two-year half-life and six neutral prior observations to limit
                   small-sample effects. Coefficients are learned with
                   regularized logistic regression. The model handles ATP singles
@@ -579,23 +613,29 @@ export default function Dashboard({ model }) {
                 </p>
                 <h3>Data freshness and rights</h3>
                 <p>
-                  Snapshot generated {model.generatedAt.slice(0, 10)}.
-                  Tournament dates describe event starts. A conservative 21-day
-                  delay keeps overlapping tournament results out of earlier
-                  predictions. This also makes ratings less current.
+                  Model weights trained {model.generatedAt.slice(0, 10)}. Player
+                  ratings, last-10 form and head-to-head histories refresh from
+                  the active feed on demand every 15 minutes, including
+                  published completed matches in ongoing tournaments. Source
+                  dates may describe tournament starts. The 21-day delay applies
+                  only to historical evaluation to guard against future-result
+                  leakage.
                 </p>
                 <p>{model.license}</p>
                 <a
                   className="text-link"
-                  href="https://github.com/Tennismylife/TML-Database"
+                  href="https://stats.tennismylife.org/tennis-match-database"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   TennisMyLife database & usage terms ↗
                 </a>
                 <p>
-                  Data sources: {model.sources.map((s) => s.year).join(", ")}.
-                  Per-file hashes are recorded in the model artifact for
+                  Data sources:{" "}
+                  {(model.historySources || model.sources)
+                    .map((s) => s.name)
+                    .join(", ")}
+                  . Per-file hashes are recorded in the model artifact for
                   provenance. This app is not affiliated with Stake or the ATP.
                 </p>
               </section>

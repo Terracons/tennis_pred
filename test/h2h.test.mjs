@@ -8,6 +8,42 @@ test("missing meetings are neutral, not invented", () => {
   assert.equal(h.signal, 0);
   assert.equal(h.surface.signal, 0);
   assert.equal(h.lastDate, null);
+  assert.equal(h.latest.count, 0);
+  assert.equal(h.latest.signal, 0);
+});
+test("latest five discards the oldest and preserves winner identities on reversal", () => {
+  const index = {};
+  for (let day = 1; day <= 6; day++)
+    updateHeadToHead(
+      index,
+      day < 3 ? "a" : "b",
+      day < 3 ? "b" : "a",
+      "Hard",
+      `2026-01-0${day}`,
+    );
+  const h = headToHead(index, "a", "b", "Hard", "2026-01-07");
+  const reverse = headToHead(index, "b", "a", "Hard", "2026-01-07");
+  assert.equal(h.total, 6);
+  assert.equal(h.latest.count, 5);
+  assert.equal(h.latest.aWins, 1);
+  assert.equal(h.latest.bWins, 4);
+  assert.deepEqual(
+    h.latest.meetings.map((m) => m.date),
+    ["2026-01-06", "2026-01-05", "2026-01-04", "2026-01-03", "2026-01-02"],
+  );
+  assert.deepEqual(h.latest.meetings, reverse.latest.meetings);
+  assert.equal(h.latest.signal, -reverse.latest.signal);
+  const x = features(freshPlayer("a", "A"), freshPlayer("b", "B"), "Hard", h);
+  assert.equal(x[5], h.latest.signal);
+  assert.ok(probability(x, [0, 0, 0, 0, 0, 1]) < 0.5);
+});
+test("fewer than five meetings stays a small sample", () => {
+  const index = {};
+  updateHeadToHead(index, "a", "b", "Grass", "2026-01-01");
+  const h = headToHead(index, "a", "b", "Hard", "2026-01-02");
+  assert.equal(h.latest.count, 1);
+  assert.equal(h.surface.latest.count, 0);
+  assert.ok(h.latest.signal < 1 / 7);
 });
 test("head-to-head swaps correctly and separates surface records", () => {
   const index = {};
@@ -45,7 +81,7 @@ test("head-to-head contributes to model features with symmetry", () => {
   updateHeadToHead(index, "a", "b", "Hard", "2025-01-01");
   const a = freshPlayer("a", "A"),
     b = freshPlayer("b", "B");
-  const weights = [1, 1, 0, 0.5, 0.5];
+  const weights = [1, 1, 0, 0.5, 0.5, 0.5];
   const pa = probability(
     features(a, b, "Hard", headToHead(index, "a", "b", "Hard", "2025-01-01")),
     weights,
