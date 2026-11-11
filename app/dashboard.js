@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { predict, SURFACES } from "../lib/model.mjs";
+import HeadToHead from "./head-to-head";
+import SlipBuilder from "./slip-builder";
 const pct = (n) => (100 * n).toFixed(1) + "%";
 const count = (n) => n.toLocaleString("en-US");
 export default function Dashboard({ model }) {
@@ -14,7 +16,7 @@ export default function Dashboard({ model }) {
     [error, setError] = useState(""),
     [oddsA, setOddsA] = useState(""),
     [oddsB, setOddsB] = useState(""),
-    [tab, setTab] = useState("predict"),
+    [tab, setTab] = useState("slips"),
     [query, setQuery] = useState("");
   const players = active.length >= 2 ? active : model.players;
   const filtered = players.filter((p) =>
@@ -25,6 +27,8 @@ export default function Dashboard({ model }) {
     setResult(null);
     setNews(null);
     setError("");
+    setOddsA("");
+    setOddsB("");
   }
   async function run(event) {
     event.preventDefault();
@@ -77,6 +81,7 @@ export default function Dashboard({ model }) {
         <div className="workspace-label">TENNIS INTELLIGENCE</div>
         <nav aria-label="Main navigation">
           {[
+            ["slips", "▧", "Slip builder"],
             ["predict", "◉", "Match lab"],
             ["performance", "▥", "Model performance"],
             ["data", "▤", "Data & methodology"],
@@ -107,9 +112,11 @@ export default function Dashboard({ model }) {
             WORKSPACE <span className="slash">/</span>{" "}
             {tab === "predict"
               ? "Match lab"
-              : tab === "performance"
-                ? "Model performance"
-                : "Data & methodology"}
+              : tab === "slips"
+                ? "Slip builder"
+                : tab === "performance"
+                  ? "Model performance"
+                  : "Data & methodology"}
           </span>
           <span className="snapshot">
             <span className="status-dot" /> Snapshot · {model.asOf}
@@ -125,6 +132,12 @@ export default function Dashboard({ model }) {
                     Read the match.
                     <br />
                     <em>Know the numbers.</em>
+                  </>
+                ) : tab === "slips" ? (
+                  <>
+                    Your target.
+                    <br />
+                    <em>Your match slip.</em>
                   </>
                 ) : tab === "performance" ? (
                   <>
@@ -143,9 +156,11 @@ export default function Dashboard({ model }) {
               <p>
                 {tab === "predict"
                   ? "Historical form, court surface, and a trained model. One considered view."
-                  : tab === "performance"
-                    ? "Measured on later matches the model did not use to learn its weights."
-                    : "Trace the data, understand the model, and see its limits."}
+                  : tab === "slips"
+                    ? "Live fixtures. Stake prices. Machine learning, statistics and head-to-head behind each pick."
+                    : tab === "performance"
+                      ? "Measured on later matches the model did not use to learn its weights."
+                      : "Trace the data, understand the model, and see its limits."}
               </p>
             </div>
             <div className="court" aria-hidden="true">
@@ -263,8 +278,8 @@ export default function Dashboard({ model }) {
                         Compare with Stake odds <span>optional +</span>
                       </summary>
                       <p>
-                        Enter decimal odds manually. This app has no Stake
-                        connection.
+                        Enter odds for a manual comparison here, or use Slip
+                        builder to fetch Stake prices automatically.
                       </p>
                       <div className="odds-inputs">
                         <label>
@@ -396,6 +411,8 @@ export default function Dashboard({ model }) {
                       "Overall strength",
                       "Surface experience",
                       "Recent form",
+                      "Head-to-head record",
+                      "Same-surface meetings",
                     ].map((label, i) => (
                       <div key={label}>
                         <span>{label}</span>
@@ -411,13 +428,18 @@ export default function Dashboard({ model }) {
                             ? "Learned overall Elo contribution"
                             : i === 1
                               ? `${result.a.surfaceMatches[surface]} vs ${result.b.surfaceMatches[surface]} recorded matches`
-                              : "Last 10 recorded results; not a fitness assessment"}
+                              : i === 2
+                                ? "Last 10 recorded results; not a fitness assessment"
+                                : i === 3
+                                  ? `${result.h2h.aWins} : ${result.h2h.bWins} across ${result.h2h.total} meetings`
+                                  : `${result.h2h.surface.aWins} : ${result.h2h.surface.bWins} on ${surface}`}
                         </small>
                       </div>
                     ))}
                   </div>
                 </section>
               )}
+              {result && <HeadToHead result={result} surface={surface} />}
               <section className="news-row">
                 <div>
                   <span className="eyebrow">03 / OFF THE COURT</span>
@@ -462,6 +484,7 @@ export default function Dashboard({ model }) {
               </section>
             </>
           )}
+          {tab === "slips" && <SlipBuilder model={model} />}
           {tab === "performance" && (
             <section className="panel details-panel">
               <span className="eyebrow">OUT-OF-TIME EVALUATION</span>
@@ -538,16 +561,21 @@ export default function Dashboard({ model }) {
                 <p>
                   Overall Elo difference, surface Elo difference, and the
                   difference in each player's win rate over their last 10
-                  recorded matches. Coefficients are learned with regularized
-                  logistic regression. The model handles ATP singles match
-                  winners only.
+                  recorded matches, plus recency-weighted overall and
+                  same-surface head-to-head records. These records use a
+                  two-year half-life and six neutral prior observations to limit
+                  small-sample effects. Coefficients are learned with
+                  regularized logistic regression. The model handles ATP singles
+                  match winners only.
                 </p>
                 <h3>What stays out</h3>
                 <p>
-                  No current injury or withdrawal detection, verified upcoming
-                  fixtures, live odds, WTA, in-play predictions, set scores, or
-                  total-games predictions. News headlines are displayed as
-                  source links; they do not automatically modify probabilities.
+                  No current injury or withdrawal analysis, WTA, in-play
+                  predictions, set scores, or total-games predictions. News
+                  headlines are displayed as source links; they do not
+                  automatically modify probabilities. The slip builder fetches
+                  upcoming ATP singles fixtures and Stake winner prices through
+                  OddsPapi, separately from the historical model.
                 </p>
                 <h3>Data freshness and rights</h3>
                 <p>

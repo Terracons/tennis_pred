@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { headToHead, updateHeadToHead } from "../lib/h2h.mjs";
 import {
   parseCsv,
   freshPlayer,
@@ -67,6 +68,7 @@ const matches = rows
       Number(a.match_num) - Number(b.match_num),
   );
 if (matches.length < 1000) throw new Error("Insufficient historical matches");
+const h2hIndex = {};
 const players = new Map(),
   samples = [],
   pending = [];
@@ -83,6 +85,7 @@ function settle(until) {
       r.surface,
       dateOf(r),
     );
+    updateHeadToHead(h2hIndex, r.winner_id, r.loser_id, r.surface, dateOf(r));
   }
 }
 for (const r of matches) {
@@ -94,7 +97,12 @@ for (const r of matches) {
     samples.push({
       date,
       available: availableAt(r),
-      x: features(a, b, r.surface),
+      x: features(
+        a,
+        b,
+        r.surface,
+        headToHead(h2hIndex, a.id, b.id, r.surface, date),
+      ),
       baseline: eloProbability(a.elo, b.elo),
     });
   pending.push({ available: availableAt(r), row: r });
@@ -106,7 +114,7 @@ const train = samples.filter((r) => r.available < cutoff),
 const weights = fit(train),
   metrics = evaluate(test, weights);
 const artifact = {
-  version: 1,
+  version: 2,
   asOf,
   generatedAt: new Date().toISOString(),
   lastTournamentDate: dateOf(matches.at(-1)),
@@ -116,11 +124,18 @@ const artifact = {
   weights,
   metrics,
   sources,
+  headToHead: h2hIndex,
+  tournamentSurfaces: Object.fromEntries(
+    matches.map((r) => [
+      r.tourney_name,
+      { surface: r.surface, date: dateOf(r) },
+    ]),
+  ),
   players: [...players.values()]
     .filter((p) => p.matches >= 10)
     .sort((a, b) => b.elo - a.elo),
   method:
-    "Regularized logistic regression on overall Elo, surface Elo and last-10 form. Fixed weights trained on earlier data; later matches tested chronologically. All results delayed 21 days because only tournament start dates are available.",
+    "Regularized logistic regression on overall Elo, surface Elo, last-10 form, overall head-to-head and same-surface head-to-head. Meetings have a two-year half-life and six neutral prior observations to temper small samples. Fixed weights trained on earlier data; later matches tested chronologically. All results, including head-to-head, are delayed 21 days because only tournament start dates are available.",
   license:
     "TennisMyLife data: personal, educational and non-commercial research only. Commercial use requires written permission. Raw data is not redistributed.",
 };
